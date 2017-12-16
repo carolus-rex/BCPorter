@@ -1,5 +1,7 @@
 import re
 
+from PIL import Image, ImageFont, ImageDraw
+
 CHAR_BACKSPACE = re.compile(".\b")    # Don't use a raw string here
 ANY_BACKSPACES = re.compile("\b+")  # or here
 
@@ -39,10 +41,13 @@ with open('test_log') as log:
 
 
 def get_commands():
-    commands = """show version
-show runn"""
+    with open("show_commands.txt") as show_commands_file:
+        commands = [(command.strip(), False) for command in show_commands_file.readlines()]
 
-    return (command.strip() for command in commands.splitlines())
+    with open("atp_commands.txt") as atp_commands_file:
+        commands.extend((command.strip(), True) for command in atp_commands_file.readlines())
+
+    return commands
 
 
 def get_command_output(command, prompt, log_name):
@@ -67,8 +72,32 @@ def get_command_output(command, prompt, log_name):
     return command_outputs
 
 
+FOREGROUND = (255, 255, 255)
+WIDTH = 375
+HEIGHT = 50
+
+
+def lines_to_png(lines, file_name):
+    font_path = 'C:\\Windows\\fonts\\lucon.ttf'
+    font = ImageFont.truetype(font_path, 14, encoding='unic')
+    (width, height) = font.getsize('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,._-?¡¿')
+
+    lines_height = height * len(lines)
+
+    x = Image.new("RGBA", (1000, lines_height), (0, 0, 0))
+
+    draw = ImageDraw.Draw(x)
+
+    for index, line in enumerate(lines):
+        draw.text((0, index * height), line, font=font, fill=FOREGROUND)
+
+    x.show()
+    x.save('%s.png' % file_name)
+
+
 prompt = 'Caj_MayorsaBrena#'
-for command in get_commands():
+
+for command, is_atp in get_commands():
     command_outputs = get_command_output(command, prompt, 'processed_log')
 
     index = 0
@@ -82,15 +111,29 @@ for command in get_commands():
 
         print("More than one %s output has been found" % command.upper())
         index = input('Choose the INDEX of the desired output: ')
+        try:
+            index = int(index)
+        except:
+            pass
 
         while index not in range(len(command_outputs)):
             print('Invalid index')
             index = input('Choose the INDEX of the desired output: ')
+            try:
+                index = int(index)
+            except:
+                continue
 
-    with open('final_report', 'a') as final_report:
-        for line in command_outputs[index]:
-            final_report.write(line)
+    if is_atp:
+        data = list(command_outputs[index])
+        data.append(prompt)
 
-        final_report.write(COMMAND_OUTPUT_SEPARATOR)
+        lines_to_png(data, command)
+    else:
+        with open('final_report', 'a') as final_report:
+            for line in command_outputs[index]:
+                final_report.write(line)
+
+            final_report.write(COMMAND_OUTPUT_SEPARATOR)
 
 print("*******************************FINISHED*****************************")
