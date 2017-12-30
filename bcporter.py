@@ -1,11 +1,25 @@
+import errno
+import os
 import re
 
 from PIL import Image, ImageFont, ImageDraw
 
-CHAR_BACKSPACE = re.compile(".\b")    # Don't use a raw string here
+CHAR_BACKSPACE = re.compile(".\b")  # Don't use a raw string here
 ANY_BACKSPACES = re.compile("\b+")  # or here
 
 COMMAND_OUTPUT_SEPARATOR = '-' * 100 + '\n'
+
+FOREGROUND = (255, 255, 255)
+WIDTH = 375
+HEIGHT = 50
+
+
+def create_dir_if_not_exists(directory):
+    try:
+        os.makedirs(directory)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
 
 
 def reset_file(file_path):
@@ -23,21 +37,11 @@ def process_non_printable(s):
     sold = ''
     while sold != s:
         sold = s
-        #print("patc=>%s<    sold=>%s<   s=>%s<" % (patc,sold,s))
+        # print("patc=>%s<    sold=>%s<   s=>%s<" % (patc,sold,s))
         s = patc.sub(sub, sold)
-        #print help(patc.sub)
+        # print help(patc.sub)
 
     return s
-
-
-reset_file('processed_log')
-reset_file('final_report')
-
-with open('test_log') as log:
-    for line in log.readlines():
-        new_line = process_non_printable(line)
-        with open('processed_log', 'a') as new_log:
-            new_log.write(new_line)
 
 
 def get_commands():
@@ -72,11 +76,6 @@ def get_command_output(command, prompt, log_name):
     return command_outputs
 
 
-FOREGROUND = (255, 255, 255)
-WIDTH = 375
-HEIGHT = 50
-
-
 def lines_to_png(lines, file_name):
     font_path = 'C:\\Windows\\fonts\\lucon.ttf'
     font = ImageFont.truetype(font_path, 14, encoding='unic')
@@ -95,45 +94,74 @@ def lines_to_png(lines, file_name):
     x.save('%s.png' % file_name)
 
 
-prompt = 'Caj_MayorsaBrena#'
+def process_log(log_to_process, prompt):
+    # reset_file('processed_log')
 
-for command, is_atp in get_commands():
-    command_outputs = get_command_output(command, prompt, 'processed_log')
+    create_dir_if_not_exists('output_dir')
+    final_report = 'output_dir/%s' % log_to_process
+    reset_file(final_report)
 
-    index = 0
-    if len(command_outputs) > 1:
-        for i, output in enumerate(command_outputs):
-            print(''.join(output))
+    should_do_atp = log_to_process.endswith('Despues')
 
-            print('     ****************************************************END OF OUTPUT %i****************' % i)
+    # with open(log_to_process) as log:
+    #     for line in log.readlines():
+    #         new_line = process_non_printable(line)
+    #         with open('processed_log', 'a') as new_log:
+    #             new_log.write(new_line)
 
-        print("***************************************************************END OF OUTPUT FOR %s*************" % command)
+    commands = get_commands()
 
-        print("More than one %s output has been found" % command.upper())
-        index = input('Choose the INDEX of the desired output: ')
-        try:
-            index = int(index)
-        except:
-            pass
+    atp_command_index = 1
 
-        while index not in range(len(command_outputs)):
-            print('Invalid index')
+    for command, is_atp in commands:
+        if is_atp and not should_do_atp:
+            continue
+
+        command_outputs = get_command_output(command, prompt, log_to_process)
+
+        index = 0
+        if len(command_outputs) > 1:
+            for i, output in enumerate(command_outputs):
+                print(''.join(output))
+
+                print('     ****************************************************END OF OUTPUT %i****************' % i)
+
+            print(
+                "***************************************************************END OF OUTPUT FOR %s*************" % command)
+
+            print("More than one %s output has been found" % command.upper())
             index = input('Choose the INDEX of the desired output: ')
             try:
                 index = int(index)
             except:
-                continue
+                pass
 
-    if is_atp:
-        data = list(command_outputs[index])
-        data.append(prompt)
+            while index not in range(len(command_outputs)):
+                print('Invalid index')
+                index = input('Choose the INDEX of the desired output: ')
+                try:
+                    index = int(index)
+                except:
+                    continue
+            print("****************************FINISHED COMMAND %s*************************" % command)
 
-        lines_to_png(data, command)
-    else:
-        with open('final_report', 'a') as final_report:
-            for line in command_outputs[index]:
-                final_report.write(line)
+        if is_atp:
+            data = list(command_outputs[index])
+            data.append(prompt)
 
-            final_report.write(COMMAND_OUTPUT_SEPARATOR)
+            lines_to_png(data, 'output_dir/ATP%i' % atp_command_index)
+            atp_command_index += 1
+        else:
+            with open(final_report, 'a') as final_report_file:
+                for line in command_outputs[index]:
+                    final_report_file.write(line)
 
-print("*******************************FINISHED*****************************")
+                final_report_file.write(COMMAND_OUTPUT_SEPARATOR)
+
+    print("*******************************FINISHED*****************************")
+
+
+if __name__ == '__main__':
+    import sys
+
+    process_log(sys.argv[1], sys.argv[2])
