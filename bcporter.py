@@ -3,7 +3,8 @@ import os
 import re
 
 from PIL import Image, ImageFont, ImageDraw
-from docxtpl import DocxTemplate
+from docx.shared import Mm
+from docxtpl import DocxTemplate, InlineImage
 
 CHAR_BACKSPACE = re.compile(".\b")  # Don't use a raw string here
 ANY_BACKSPACES = re.compile("\b+")  # or here
@@ -128,6 +129,11 @@ def process_log(log_to_process, prompt):
     commands = get_commands()
 
     atp_command_index = 1
+    if should_do_atp:
+        atp_context = {}
+
+        atp_report = DocxTemplate("ATP_TEMPLATE.docx")
+        atp_context["atm_name"] = prompt[:-1].replace('&', '&#038;').upper()
 
     if should_blank:
         state = "despues" if log_to_process.endswith("Despues") else "antes"
@@ -182,7 +188,10 @@ def process_log(log_to_process, prompt):
             data = list(command_outputs[index])
             data.append(prompt)
 
-            lines_to_png(data, 'output_dir/ATP%i' % atp_command_index)
+            atp_image_path = lines_to_png(data, 'output_dir/ATP%i' % atp_command_index)
+
+            atp_context["ATP%i" % atp_command_index] = InlineImage(atp_report, atp_image_path, width=Mm(140))
+
             atp_command_index += 1
 
         elif command_type == BLANK:
@@ -198,6 +207,10 @@ def process_log(log_to_process, prompt):
                     final_report_file.write(line)
 
                 final_report_file.write(COMMAND_OUTPUT_SEPARATOR)
+
+    if should_do_atp:
+        atp_report.render(atp_context)
+        atp_report.save("output_dir/BCP - %s (ATP).doc.docx" % prompt[:-1].upper())
 
     if should_blank:
         blank_report.render(blank_context)
