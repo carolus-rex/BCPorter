@@ -136,7 +136,7 @@ def process_log(log_to_process, prompt):
 
         if state == "antes":
             blank_report = DocxTemplate("BLANK_TEMPLATE_Antes.docx")
-            blank_context["atm_name"] = prompt[:-1]
+            blank_context["atm_name"] = prompt[:-1].replace('&', '&#038;')
         else:
             blank_report = DocxTemplate("BLANK_TEMPLATE_Despues.docx")
 
@@ -186,11 +186,11 @@ def process_log(log_to_process, prompt):
             atp_command_index += 1
 
         elif command_type == BLANK:
-            underscore_command = command.replace(" ", "_")
-            blank_context[underscore_command + "_%s" % (state)] = ''.join(command_outputs[index])
+            underscore_command = command.replace(" ", "_").replace('&', '&#038;')
+            blank_context[underscore_command + "_%s" % (state)] = ''.join(command_outputs[index]).replace('&', '&#038;')
 
             if state == "antes":
-                blank_context[underscore_command + "_despues"] = "{{%s_despues}}" % underscore_command
+                blank_context[underscore_command + "_despues"] = "{{%s_despues}}" % underscore_command.replace('&', '&#038;')
 
         else:
             with open(final_report, 'a') as final_report_file:
