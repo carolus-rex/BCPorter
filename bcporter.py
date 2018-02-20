@@ -196,7 +196,7 @@ def process_log(log_to_process, prompt):
 
         elif command_type == BLANK:
             underscore_command = command.replace(" ", "_").replace('&', '&#038;')
-            blank_context[underscore_command + "_%s" % (state)] = ''.join(command_outputs[index]).replace('&', '&#038;')
+            blank_context[underscore_command + "_%s" % (state)] = '<w:br/>'.join(command_outputs[index]).replace('&', '&#038;')
 
             if state == "antes":
                 blank_context[underscore_command + "_despues"] = "{{%s_despues}}" % underscore_command.replace('&', '&#038;')
