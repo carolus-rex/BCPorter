@@ -2,6 +2,7 @@ import errno
 import os
 import re
 
+from win32com.shell import shell, shellcon
 from PIL import Image, ImageFont, ImageDraw
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage
@@ -20,12 +21,23 @@ ATP = 1
 BLANK = 2
 
 
+def get_desktop_path():
+
+    return shell.SHGetFolderPath(0, shellcon.CSIDL_DESKTOP, None, 0)
+
+
 def create_dir_if_not_exists(directory):
     try:
         os.makedirs(directory)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
+
+DATA_PATH = os.path.expandvars(os.path.join(get_desktop_path(), "BCPorter"))
+create_dir_if_not_exists(DATA_PATH)
+
+OUTPUT_DIR = os.path.expandvars(os.path.join(get_desktop_path(), "BCPorter", "output_dir"))
 
 
 def reset_file(file_path):
@@ -51,13 +63,13 @@ def process_non_printable(s):
 
 
 def get_commands():
-    with open("show_commands.txt") as show_commands_file:
+    with open("%s/show_commands.txt" % DATA_PATH) as show_commands_file:
         commands = [(command.strip(), LOG) for command in show_commands_file.readlines()]
 
-    with open("atp_commands.txt") as atp_commands_file:
+    with open("%s/atp_commands.txt" % DATA_PATH) as atp_commands_file:
         commands.extend((command.strip(), ATP) for command in atp_commands_file.readlines())
 
-    with open("blank_commands.txt") as blank_commands_file:
+    with open("%s/blank_commands.txt" % DATA_PATH) as blank_commands_file:
         commands.extend((command.strip(), BLANK) for command in blank_commands_file.readlines())
 
     return commands
@@ -86,7 +98,7 @@ def get_command_output(command, prompt, log_name):
 
 
 def lines_to_png(lines, file_name):
-    font_path = 'C:\\Windows\\fonts\\lucon.ttf'
+    font_path = os.path.join(os.environ['WINDIR'], 'Fonts', "lucon.ttf")
     font = ImageFont.truetype(font_path, 14, encoding='unic')
     (width, height) = font.getsize('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,._-?¡¿')
 
@@ -114,8 +126,8 @@ def place_image_into_word(tpl, pic_placeholder, image_path):
 def process_log(log_to_process, prompt):
     # reset_file('processed_log')
 
-    create_dir_if_not_exists('output_dir')
-    final_report = 'output_dir/%s' % log_to_process
+    create_dir_if_not_exists(OUTPUT_DIR)
+    final_report = '%s/%s' % (OUTPUT_DIR, log_to_process)
     reset_file(final_report)
 
     should_do_atp = log_to_process.endswith('Despues')
@@ -132,7 +144,7 @@ def process_log(log_to_process, prompt):
     if should_do_atp:
         atp_context = {}
 
-        atp_report = DocxTemplate("ATP_TEMPLATE.docx")
+        atp_report = DocxTemplate("%s/ATP_TEMPLATE.docx" % DATA_PATH)
         atp_context["atm_name"] = prompt[:-1].replace('&', '&#038;').upper()
 
     if should_blank:
@@ -141,10 +153,10 @@ def process_log(log_to_process, prompt):
         blank_context = {}
 
         if state == "antes":
-            blank_report = DocxTemplate("BLANK_TEMPLATE_Antes.docx")
+            blank_report = DocxTemplate("%s/BLANK_TEMPLATE_Antes.docx" % DATA_PATH)
             blank_context["atm_name"] = prompt[:-1].replace('&', '&#038;')
         else:
-            blank_report = DocxTemplate("BLANK_TEMPLATE_Despues.docx")
+            blank_report = DocxTemplate("%s/BLANK_TEMPLATE_Despues.docx" % DATA_PATH)
 
     for command, command_type in commands:
         if command_type == ATP and not should_do_atp:
@@ -188,7 +200,7 @@ def process_log(log_to_process, prompt):
             data = list(command_outputs[index])
             data.append(prompt)
 
-            atp_image_path = lines_to_png(data, 'output_dir/ATP%i' % atp_command_index)
+            atp_image_path = lines_to_png(data, '%s/ATP%i' % (OUTPUT_DIR, atp_command_index))
 
             atp_context["ATP%i" % atp_command_index] = InlineImage(atp_report, atp_image_path, width=Mm(140))
 
@@ -210,15 +222,15 @@ def process_log(log_to_process, prompt):
 
     if should_do_atp:
         atp_report.render(atp_context)
-        atp_report.save("output_dir/BCP - %s (ATP).doc.docx" % prompt[:-1].upper())
+        atp_report.save("%s/BCP - %s (ATP).doc.docx" % (OUTPUT_DIR, prompt[:-1].upper()))
 
     if should_blank:
         blank_report.render(blank_context)
 
         if state == "antes":
-            blank_report.save("BLANK_TEMPLATE_Despues.docx")
+            blank_report.save("%s/BLANK_TEMPLATE_Despues.docx" % DATA_PATH)
         else:
-            blank_report.save("output_dir/blank_report.docx")
+            blank_report.save("%s/blank_report.docx" % OUTPUT_DIR)
 
 
     print("*******************************FINISHED*****************************")
